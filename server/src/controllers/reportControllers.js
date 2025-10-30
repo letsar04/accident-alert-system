@@ -1,78 +1,74 @@
-import { PrismaClient } from "@prisma/client";
-import nodemailer from "nodemailer";
+import { PrismaClient } from '../../generated/prisma/index.js';
 
 const prisma = new PrismaClient();
 
-// --- CREATE REPORT ---
+// === Contrôleur : gestion des rapports d'accidents ===
+
+export const getAllReports = async (req, res) => {
+  try {
+    const reports = await prisma.report.findMany();
+    res.json(reports);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la récupération des rapports" });
+  }
+};
+
+export const getReportById = async (req, res) => {
+  try {
+    const report = await prisma.report.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    if (!report) return res.status(404).json({ error: "Rapport non trouvé" });
+    res.json(report);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la récupération du rapport" });
+  }
+};
+
 export const createReport = async (req, res) => {
   try {
     const { user_id, gps_lat, gps_long, severity, description } = req.body;
 
+    // Validation simple
     if (!user_id || !gps_lat || !gps_long || !severity) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "Champs requis manquants" });
     }
 
-    const newReport = await prisma.report.create({
+    const report = await prisma.report.create({
       data: { user_id, gps_lat, gps_long, severity, description },
     });
 
-    console.log("✅ New report saved:", newReport);
-
-    // === EMAIL ALERT SYSTEM ===
-    if (severity.toLowerCase() === "grave" || severity.toLowerCase() === "critique") {
-      await sendEmergencyEmail(newReport);
-    }
-
-    return res.status(201).json(newReport);
-  } catch (err) {
-    console.error("❌ Error creating report:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(201).json(report);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la création du rapport" });
   }
 };
 
-// --- GET ALL REPORTS ---
-export const getAllReports = async (req, res) => {
+export const updateReport = async (req, res) => {
   try {
-    const reports = await prisma.report.findMany({
-      orderBy: { createdAt: "desc" },
+    const { user_id, gps_lat, gps_long, severity, description } = req.body;
+    const report = await prisma.report.update({
+      where: { id: parseInt(req.params.id) },
+      data: { user_id, gps_lat, gps_long, severity, description },
     });
-    res.json(reports);
-  } catch (err) {
-    console.error("❌ Error fetching reports:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.json(report);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du rapport" });
   }
 };
 
-// --- EMAIL FUNCTION ---
-const sendEmergencyEmail = async (report) => {
+export const deleteReport = async (req, res) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+    await prisma.report.delete({
+      where: { id: parseInt(req.params.id) },
     });
-
-    const message = `
-🚨 URGENT — Signalement d'accident 🚨
-
-Gravité : ${report.severity}
-Description : ${report.description}
-Localisation : Latitude ${report.gps_lat}, Longitude ${report.gps_long}
-
-Veuillez dépêcher une unité immédiatement.
-    `;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: "hopital@example.com, police@example.com",
-      subject: "🚨 URGENT : Nouveau signalement d'accident",
-      text: message,
-    });
-
-    console.log("📨 Alerte envoyée aux services d’urgence");
-  } catch (err) {
-    console.error("⚠️ Échec d’envoi d’email :", err);
+    res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erreur lors de la suppression du rapport" });
   }
 };
