@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import reportRoutes from './routes/reportRoutes.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ app.get('/', (req, res) => {
 
 // === Routes principales ===
 app.use('/api/reports', reportRoutes);
+
+// Middleware global de gestion des erreurs
+app.use(errorHandler);
 
 // === Lancement du serveur ===
 app.listen(port, () => {
